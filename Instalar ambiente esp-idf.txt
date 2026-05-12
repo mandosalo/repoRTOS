@@ -1,0 +1,167 @@
+INSTALACION DE AMBIENTE DE DESARROLLO AISLADO PARA ESP-IDF EN UNA 
+RASPBERRY PI / LINUX
+
+1. ACTUALIZAR SISTEMA E INSTALAR DOCKER
+
+$ sudo apt-get update && sudo apt-get upgrade -y
+$ curl -fsSL https://get.docker.com -o get-docker.sh
+$ sudo sh get-docker.sh
+
+Ejecutar comandos de Docker sin usar sudo:
+Identificar el usuario y
+Agregar el usuario $USER al grupo Docker
+
+$ echo $USER
+$ sudo usermod -aG docker $USER
+
+Reiniciar para que tenga efecto.
+
+Verificar que Docker se instaló correctamente:
+$ docker -v
+
+==============================================================
+
+2. CREACION DEL CONTENEDOR PARA DESARROLLO CON ESP-IDF
+
+Crear una carpeta para Desarrollo en un directorio conveniente, por ejemplo:
+/Documentos/Docker/espidf
+
+Dentro de este directorio crear el archivo de configuracion llamado Dockerfile.
+Usar como base la imagen oficial: espressif/idf
+Espressif indica que esta imagen ya incluye ESP-IDF, Python 3.10+, Git, 
+wget, curl, zip y herramientas necesarias para compilar proyectos ESP-IDF.
+
+Crear el Dockerfile con los paquetes recomendados o con los siguientes:
+(ver el archivo Dockerfile)
+
+Cualquier directorio y archivo que se genere dentro del contenedor, se verá en 
+esta misma ruta y podrá ser modificado desde el host.
+
+
+Construir la imagen del Dockerfile. 
+
+En este paso se descargan las herramientas listadas en el Dockerfile 
+y el ambiente linux minimo requerido.
+Dentro del directorio de desarrollo ejecutar:
+$ docker build -t nombre-de-la-imagen .
+
+$ docker build -t esp-idf-rpi-dev .
+
+Una vez construida la imagen ya se puede ejecutar el Contenedor. 
+========================================================================
+
+3. EJECUCION DEL CONTENEDOR.
+
+
+
+
+
+
+
+
+INSTALACION DEL ESPIDF
+
+ya en el ambiente del docker ir a la carpeta donde se aloja el espidf
+y ejecutar la instalación /install.sh
+de igual forma ejecutar el . ./export.sh
+
+regresar al workspace de desarrollo  creado por default.
+
+ya se puede ejecutar idf.py menuconfig y demás opciones de configuracion.
+
+crear carpeta para alojar los proyectos.
+ De ahora en adelante todo es por línea de comando ( en consola) o bien
+ para editar archivos, desde el host.
+ 
+crear la carpeta del proyecto y dentro ejecutar idf.py create-project Nombredelproyecto
+dentro se crea la carpeta main y dentro de esta el archivo fuente.c 
+tambien se crea el archivo Cmakelists.txt
+
+
+para editar el archivo fuente se puede hacer con:
+nano main/proyecto_main.c
+
+Para compilar se ejecuta idf.py build
+
+---------------------------------------------------------------------
+
+-No ejecutar el contenedor con sudo para evitar conflictos de permisos
+de acceso a archivos. Es importante haber agregado el usuario al grupo Docker
+y haber reiniciado el sistema en el paso 1.
+
+
+De esta forma los archivos creados desde el ambiente del contenedor serán 
+tambien propiedad del usuario del host y podrán ser editables desde fuera del contenedor.
+(flujo de trabajo mas agil al usar herramientas como editores de texto, monitor de puerto serie, etc.)
+
+para identificar el usuario y grupo en el host ejecutar:
+
+$ id
+
+puede mostrar algo como:
+uid=1000(mando) gid=1000(mando) groups=1000(mando)
+
+
+Ese mismo usuario deberá crear los archivos dentro del contenedor, para ello se debe montar el 
+contenedor con el uid y gid del usuario en el host. 
+
+Dentro de la ruta del directorio dedicado que contiene el Dockerfile ejecutar:
+
+$ docker run -it --rm  \
+--user $(id -u):$(id -g) \
+--device=/dev/ttyUSB0 \
+--group-add dialout \
+-v $PWD:/workspace  \
+ esp-idf-rpi-dev:latest \
+bash
+
+NOTA: para evitar error de montaje por no encontrar dispositivo /dev/ttyUSB0, conectar
+previamente la tarjeta ESP.
+
+Si se logra ejecutar con el mismo uid del host, se verá el nombre del usuario actual como "ubuntu" o algo similar:
+
+ubuntu@8f74c211dca0:/workspace$
+
+por el contrario, si se montó el docker con sudo, el usuario será "root".
+
+Una vez montado el ambiente, aparentemente el ambiente está listo, pero solo
+están los archivos del framework en las rutas especificadas.
+Para las herramientas del ESP-IDF la ruta es: /opt/esp/idf
+
+Dentro del workspace solo se encuentra el archivo de configuracion Docker que no tocaremos.
+/workspace$ ls
+Dockerfile
+
+podemos explorar la estructura del sistema de archivos:
+
+/workspace$ cd ..
+/$ ls
+
+Y veremos la estructura reducida de un sistema linux, donde ubicaremos
+el directorio opt
+
+Realizar instalacion de ESP-IDF
+Colocarnos en la ruta /opt/esp/idf para ejecutar el instalador. Este paso
+se hace solo una vez y permanece despues de salir y volver a montar el contenedor.
+
+  ./install.sg esp32
+
+o instalar todas las tarjetas:
+
+  ./install.sh all
+
+
+
+
+
+
+
+
+En caso de que se hayan creado archivos con sudo, el uid y gid será root. 
+Para cambiarlos al usuario actual, desde el host y desde el directorio 
+donde se encuentra el archivo de configuracion del contenedor.
+
+sudo chown -R $(id -u):$(id -g) .
+
+
+
